@@ -159,6 +159,13 @@ if  [[ "$OSTREE_VERSION" == "" ]]; then
 fi
 KARGS=$(rpm-ostree kargs)
 
+OSTREE_STATE=$(rpm-ostree status | grep "idle" || :)
+if [[ "$OSTREE_STATE" != "State: idle" ]]; then
+  echo "You have an unfinished update! Please try again after waiting for the update to complete and rebooting."
+  echo "You can check via ${bold}rpm-ostree status${normal}."
+  exit 1
+fi
+
 case "$1" in
   "current") print_status ;;
   "help"|"-h"|"--help"|"") interactive_menu ;;
