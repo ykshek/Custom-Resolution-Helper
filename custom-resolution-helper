@@ -58,6 +58,7 @@ add() {
   local R=''
   local i=''
   local m=''
+  local e=''
 
   echo "Enter your resolution for ${bold}$ADD_MONITOR${normal}. "
   echo "    For example, ${bold}1920x1080${normal}."
@@ -70,16 +71,20 @@ add() {
   if confirm "Do you want the timing to be calculated using the ${bold}VESA(TM) Coordinated Video Timings(CVT)${normal} instead of looking up the mode from a table?"; then
     M="M"
   fi
-  if confirm "Do you want the timing to be calculated with a ${bold}'Reduced Blanking'${normal}?(You probably want this if you are using a high resolution & refresh rate monitor)"; then
+  if confirm "Do you want the timing to be calculated with a ${bold}'Reduced Blanking'${normal}? (You probably want this if you are using a high resolution & refresh rate monitor)"; then
     R="R"
   fi
   if confirm "Is this resolution ${bold}Interlaced${normal}?"; then
     i="i"
   fi
-  if confirm "Do you want to add ${bold}margins${normal} to the calculation?(1.8% of xres rounded down to 8 pixels and 1.8% of yres)"; then
+  if confirm "Do you want to add ${bold}margins${normal} to the calculation? (1.8% of xres rounded down to 8 pixels and 1.8% of yres)"; then
     m="m"
   fi
-  ADD_RESOLUTION=$(echo -n "$ADD_MONITOR:$xyres$M$R@$refresh$i$m")
+  if confirm "Do you want to make this display always enabled? (This is useful for making a virtual display for game streaming with Sunshine)"; then
+    e="e"
+  fi
+
+  ADD_RESOLUTION=$(echo -n "$ADD_MONITOR:$xyres$M$R@$refresh$i$m$e")
   echo "Your kernel argument for the resolution is ${bold}$ADD_RESOLUTION${normal}"
   ADD_KARGS=$(echo -n "--append-if-missing=video=$ADD_RESOLUTION")
   if confirm "Would you like to apply it now?"; then
