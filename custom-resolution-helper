@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#set -eo pipefail
+set -eo pipefail
 source /usr/lib/ujust/ujust.sh
 source /etc/os-release
 
@@ -42,13 +42,12 @@ print_status() {
 #Usage Functions
 add() {
   echo "Select a monitor, this should be any one of the connected ports."
-  #This one liner is modified from https://superuser.com/questions/1137574/
   MONITOR_OPTS=$(gum choose $(for p in /sys/class/drm/*/status; do
     con=${p%/status};
     echo -n "${con#*/card?-}:$(cat "$p" | tr '\n' ' ')";
     done) Cancel)
   if [[ "$MONITOR_OPTS" = "Cancel" ]]; then
-    return 1;
+    return 0;
   fi
   echo "$(echo "$MONITOR_OPTS" | grep -o '^[^:]*')"
   ADD_MONITOR=$(echo "$(echo "$MONITOR_OPTS" | grep -o '^[^:]*')")
@@ -61,12 +60,12 @@ add() {
   local m=''
 
   echo "Enter your resolution for ${bold}$ADD_MONITOR${normal}. "
-  echo "\tFor example, ${bold}1920x1080${normal}."
-  read -p "\tYour Resolution: " xyres
+  echo "    For example, ${bold}1920x1080${normal}."
+  read -p "    Your Resolution: " xyres
 
   echo "Enter your refresh rate for ${bold}$ADD_MONITOR${normal}."
-  echo "\tFor example, ${bold}75${normal}, if your desired resolution is ${bold}$xyres@75Hz${normal}"
-  read -p "\tYour Refresh Rate: " refresh
+  echo "    For example, ${bold}75${normal}, if your desired resolution is ${bold}$xyres@75Hz${normal}"
+  read -p "    Your Refresh Rate: " refresh
 
   if confirm "Do you want the timing to be calculated using the ${bold}VESA(TM) Coordinated Video Timings(CVT)${normal} instead of looking up the mode from a table?"; then
     M="M"
@@ -87,7 +86,7 @@ add() {
     rpm-ostree kargs $ADD_KARGS
   else
     echo "Cancelled."
-    return 1;
+    return 0;
   fi
 }
 
@@ -102,7 +101,7 @@ remove() {
     rpm-ostree kargs $RM_KARGS
   else
     echo "Cancelled."
-    return 1;
+    return 0;
   fi
 }
 
@@ -115,7 +114,7 @@ removeAll() {
     rpm-ostree kargs $RM_KARGS
   else
     echo "Cancelled."
-    return 1;
+    return 0;
   fi
 }
 
@@ -123,6 +122,8 @@ removeAll() {
 interactive_menu(){
   while true; do
     clear
+    echo "$helptext"
+    echo
     print_status
     echo "Add, Remove, Remove All or Exit without saving?"
     OPTION=$(ugum choose Add Remove Remove-All Exit)
