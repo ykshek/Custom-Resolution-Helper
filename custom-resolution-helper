@@ -60,9 +60,17 @@ add() {
   local m=''
   local e=''
 
+  local res_check=''
+  until [[ $res_check != "" ]]; do
   echo "Enter your resolution for ${bold}$ADD_MONITOR${normal}. "
   echo "    For example, ${bold}1920x1080${normal}."
   read -p "    Your Resolution: " xyres
+  res_check=$(echo "$xyres" | grep -oE '[0-9]+x[0-9]+' || :)
+  if [[ $res_check == "" ]]; then
+    echo "Invalid resolution ${bold}$xyres${normal}"
+  fi
+  done
+
 
   echo "Enter your refresh rate for ${bold}$ADD_MONITOR${normal}."
   echo "    For example, ${bold}75${normal}, if your desired resolution is ${bold}$xyres@75Hz${normal}"
