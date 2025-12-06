@@ -1,0 +1,165 @@
+#!/usr/bin/bash
+#set -eo pipefail
+source /usr/lib/ujust/ujust.sh
+source /etc/os-release
+
+helptext="====== Custom Resolution Helper Util ======
+
+This tool helps with setting a custom resolution using modedb kernel arguments.
+
+Usage: $(basename "$0")
+
+This is currently only an interactive tool, for now.
+"
+
+#Utility functions, mostly copied from brh
+confirm() {
+  local msg="$1"
+  echo -n "$msg ${yellow}(Y/n)${normal} "
+  read -r reply
+  [[ -z "$reply" || "${reply,,}" =~ ^y ]]
+}
+
+press_any_key() {
+  echo "Press Enter to continue..."
+  read -r
+}
+
+print_status() {
+  echo -n "Current custom resolution(s) are: "
+  MODEDB_OPTS=$(echo "$KARGS" | grep -oP 'video=\K[^ ]*')
+  if [ -z "$MODEDB_OPTS" ]; then
+    echo -n "${bold}None${normal}"
+  else
+    readarray -t OPT_ARRAY < <(echo "$MODEDB_OPTS")
+    for mode_options in "${OPT_ARRAY[@]}"; do
+      echo -n "${bold}$mode_options${normal} "
+    done
+  fi
+  echo
+}
+
+#Usage Functions
+add() {
+  echo "Select a monitor, this should be any one of the connected ports."
+  #This one liner is modified from https://superuser.com/questions/1137574/
+  MONITOR_OPTS=$(gum choose $(for p in /sys/class/drm/*/status; do
+    con=${p%/status};
+    echo -n "${con#*/card?-}:$(cat "$p" | tr '\n' ' ')";
+    done) Cancel)
+  if [[ "$MONITOR_OPTS" = "Cancel" ]]; then
+    return 1;
+  fi
+  echo "$(echo "$MONITOR_OPTS" | grep -o '^[^:]*')"
+  ADD_MONITOR=$(echo "$(echo "$MONITOR_OPTS" | grep -o '^[^:]*')")
+  #The final form is <xres>x<yres>[M][R][-<bpp>][@<refresh>][i][m] according to the kernel modedb docs
+  local xyres=''
+  local refresh=''
+  local M=''
+  local R=''
+  local i=''
+  local m=''
+
+  echo "Enter your resolution for ${bold}$ADD_MONITOR${normal}. "
+  echo "\tFor example, ${bold}1920x1080${normal}."
+  read -p "\tYour Resolution: " xyres
+
+  echo "Enter your refresh rate for ${bold}$ADD_MONITOR${normal}."
+  echo "\tFor example, ${bold}75${normal}, if your desired resolution is ${bold}$xyres@75Hz${normal}"
+  read -p "\tYour Refresh Rate: " refresh
+
+  if confirm "Do you want the timing to be calculated using the ${bold}VESA(TM) Coordinated Video Timings(CVT)${normal} instead of looking up the mode from a table?"; then
+    M="M"
+  fi
+  if confirm "Do you want the timing to be calculated with a ${bold}'Reduced Blanking'${normal}?(You probably want this if you are using a high resolution & refresh rate monitor)"; then
+    R="R"
+  fi
+  if confirm "Is this resolution ${bold}Interlaced${normal}?"; then
+    i="i"
+  fi
+  if confirm "Do you want to add ${bold}margins${normal} to the calculation?(1.8% of xres rounded down to 8 pixels and 1.8% of yres)"; then
+    m="m"
+  fi
+  ADD_RESOLUTION=$(echo -n "$ADD_MONITOR:$xyres$M$R@$refresh$i$m")
+  echo "Your kernel argument for the resolution is ${bold}$ADD_RESOLUTION${normal}"
+  ADD_KARGS=$(echo -n "--append-if-missing=video=$ADD_RESOLUTION")
+  if confirm "Would you like to apply it now?"; then
+    rpm-ostree kargs $ADD_KARGS
+  else
+    echo "Cancelled."
+    return 1;
+  fi
+}
+
+remove() {
+  echo "Which custom resolution do you want to remove?"
+  RM_RESOLUTION=$(gum choose $(for mode_options in "${OPT_ARRAY[@]}"; do
+    echo -n "$mode_options "
+    done))
+  if confirm "Remove ${bold}$RM_RESOLUTION${normal}?"; then
+    RM_KARGS=$(echo -n "--delete-if-present=video=$RM_RESOLUTION")
+    echo "Command: ${bold}rpm-ostree kargs $RM_KARGS${normal}"
+    rpm-ostree kargs $RM_KARGS
+  else
+    echo "Cancelled."
+    return 1;
+  fi
+}
+
+removeAll() {
+  if confirm "Remove All Custom Resolutions?"; then
+    RM_KARGS=$(for mode_options in "${OPT_ARRAY[@]}"; do
+      echo -n "--delete-if-present=video=$mode_options "
+      done)
+    echo "Command: ${bold}rpm-ostree kargs $RM_KARGS${normal}"
+    rpm-ostree kargs $RM_KARGS
+  else
+    echo "Cancelled."
+    return 1;
+  fi
+}
+
+
+interactive_menu(){
+  while true; do
+    clear
+    print_status
+    echo "Add, Remove, Remove All or Exit without saving?"
+    OPTION=$(ugum choose Add Remove Remove-All Exit)
+
+
+    case "$OPTION" in
+      "Add")
+        clear
+        add
+      ;;
+      "Remove")
+        clear
+        remove
+      ;;
+      "Remove-All")
+        clear
+        removeAll
+      ;;
+      "Exit")
+        echo "Exiting"
+        exit 0
+      ;;
+    esac
+  done
+}
+
+
+#Main
+#If OSTREE_VERSION is blank, then this is not fedora atomic
+if  [[ "$OSTREE_VERSION" == "" ]]; then
+  echo "This is NOT Fedora Atomic, exiting"
+  exit 0
+fi
+KARGS=$(rpm-ostree kargs)
+
+case "$1" in
+  "current") print_status ;;
+  "help"|"-h"|"--help"|"") interactive_menu ;;
+  *) echo "Unknown option: $1. Run without arguments for interactive mode."
+esac
